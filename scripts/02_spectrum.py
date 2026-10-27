@@ -40,19 +40,38 @@ def marchenko_pastur(lam, q, sigma2):
     return density
 
 
-fig, ax = plt.subplots(figsize=(8, 4))
-ax.hist(eigenvalues, bins=np.linspace(0, 4, 80), density=True, alpha=0.6,
-        label="Eigenvalues of the real correlation matrix")
+rng = np.random.default_rng(0)
+shuffled = returns.values.copy()
+for j in range(N):
+    rng.shuffle(shuffled[:, j])
+Xs = (shuffled - shuffled.mean(axis=0)) / shuffled.std(axis=0, ddof=1)
+eig_shuffled = np.linalg.eigvalsh(Xs.T @ Xs / (T - 1))
+print(f"Shuffled data: eigenvalues between {eig_shuffled.min():.2f} and "
+      f"{eig_shuffled.max():.2f} (theory: {(1 - np.sqrt(q)) ** 2:.2f} to "
+      f"{(1 + np.sqrt(q)) ** 2:.2f})")
+
+bins = np.linspace(0, 4, 80)
 x = np.linspace(0.01, 4, 1000)
-ax.plot(x, marchenko_pastur(x, q, sigma2), color="black",
-        label="Marchenko-Pastur (pure noise)")
-ax.axvline(lam_max, color="red", ls="--", label=f"Noise edge = {lam_max:.2f}")
-ax.text(3.95, ax.get_ylim()[1] * 0.5,
-        f"Largest eigenvalue = {eigenvalues[0]:.0f}\n(market mode, off the chart)",
-        ha="right")
-ax.set(xlabel="Eigenvalue", ylabel="Density",
-       title=f"Spectrum of the correlation matrix of {N} US stocks, 2015-2025")
-ax.legend()
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4), sharey=True)
+
+ax1.hist(eig_shuffled, bins=bins, density=True, alpha=0.6, color="tab:green",
+         label="Shuffled returns")
+ax1.plot(x, marchenko_pastur(x, q, 1.0), color="black", label="Marchenko-Pastur")
+ax1.set(xlabel="Eigenvalue", ylabel="Density",
+        title="Control: correlations destroyed by shuffling")
+ax1.legend()
+
+ax2.hist(eigenvalues, bins=bins, density=True, alpha=0.6,
+         label="Real returns")
+ax2.plot(x, marchenko_pastur(x, q, sigma2), color="black",
+         label="Marchenko-Pastur, market removed")
+ax2.axvline(lam_max, color="red", ls="--", label=f"Noise edge = {lam_max:.2f}")
+ax2.text(3.95, ax2.get_ylim()[1] * 0.5,
+         f"Largest eigenvalue = {eigenvalues[0]:.0f}\n(market mode, off the chart)",
+         ha="right")
+ax2.set(xlabel="Eigenvalue", title=f"Real correlations, {N} US stocks, 2015-2025")
+ax2.legend()
+
 fig.tight_layout()
 fig.savefig(FIG / "spectrum.png", dpi=150)
 print("Figure saved to", FIG / "spectrum.png")
